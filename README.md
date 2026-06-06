@@ -1,53 +1,66 @@
-  1. Hardware Strategy
+# Solar Weeding Robot (Weeder)
 
-  Core Controller
-   * Recommended Hardware: ESP32-S3-WROOM-1-N16R8 (16MB Flash, 8MB PSRAM).
-   * Rationale: The 8MB PSRAM is critical for handling the 1600x1200 image buffers and the MobileNet-based TFLite model. The S3's dual-core architecture allows one core to handle the Web Server/Connectivity while the other manages AI inference and motor control.
+This repository contains the software and documentation for a solar-powered autonomous weeding robot. The project supports two architectures: the original **Raspberry Pi Zero 2 W** implementation and the new, high-efficiency **ESP32-S3** firmware.
 
-  Peripherals
-   * Camera: OV2640 or OV5640. These are compatible with the ESP32-S3's parallel DVP interface.
-   * Motor Drivers: The existing H-Bridge drivers (DRV8833 or similar) are 3.3V logic compatible and can be driven directly by ESP32 PWM pins.
-   * Servos: ESP32 can generate precise PWM for the 4 servos (Swing, Tilt, Roll, Lid) using its LEDC or MCPWM hardware peripherals.
+Learn more about the project at the [YouTube link here](https://www.youtube.com/watch?v=your-video-id-here).
 
-  2. Software Architecture
+---
 
-  Framework & Libraries
-   * Development Environment: PlatformIO or Arduino IDE (C++).
-   * AI Inference: TensorFlow Lite Micro (TFLM). The existing model_int8.tflite will be converted to a C++ header file using xxd.
-   * Vision: Use the esp_camera library for capture and custom pixel-based algorithms for "bright spot" detection (replacing the OpenCV threshold and findContours logic used for sun orientation).
-   * Web Interface: ESPAsyncWebServer to replicate the Flask-based control panel.
-   * Storage: LittleFS for serving the web UI and an SD Card (via SPI) for saving logs and images.
+##  Architectures
 
-  3. Proposed Pin Mapping (ESP32-S3)
+### 1. ESP32-S3 Implementation (Current)
+The ESP32-S3 version is optimized for power efficiency, instant-on performance, and reliability. It utilizes the S3's AI acceleration for weed classification.
 
-  ┌──────────────────┬──────────────────┬─────────────────────────────────┐
-  │ Function         │ ESP32-S3 GPIO    │ Note                            │
-  ├──────────────────┼──────────────────┼─────────────────────────────────┤
-  │ Camera DVP       │ 1-14, 38, 39, 40 │ Standard ESP32-S3 Camera Pinout │
-  │ Robot (Wheels) L │ 15, 16           │ Phase/Enable Control            │
-  │ Robot (Wheels) R │ 17, 18           │ Phase/Enable Control            │
-  │ Z-Axis L         │ 19, 20           │ Phase/Enable Control            │
-  │ Z-Axis R         │ 21, 35           │ Phase/Enable Control            │
-  │ Servo: Lid       │ 41               │ PWM (LEDC)                      │
-  │ Servo: Tilt      │ 42               │ PWM (LEDC)                      │
-  │ Servo: Roll      │ 45               │ PWM (LEDC)                      │
-  4. Implementation Plan
+#### Hardware Requirements
+* **Controller:** ESP32-S3-WROOM-1-N16R8 (16MB Flash, 8MB PSRAM)
+* **Camera:** OV2640 or OV5640
+* **Motor Drivers:** H-Bridge (e.g., DRV8833)
+* **Servos:** 4x Standard PWM Servos (Lid, Tilt, Roll, Swing)
 
-  Phase 1: Research & Setup
-   1. Model Conversion: Convert model_int8.tflite to a C array. Verify memory requirements (MobileNetV2 INT8 usually fits in ~3-4MB).
-   2. Logic Porting: Translate the Python sunTracker() and orientToSun() algorithms into C++. Replace imutils and cv2 calls with optimized loops for the ESP32's camera_fb_t buffer.
+#### Setup & Installation
+The ESP32 firmware is located in the `esp32_firmware/` directory and is managed via **PlatformIO**.
 
-  Phase 2: Execution
-   1. Firmware Core: Implement the Wi-Fi Access Point and Async Web Server.
-   2. Actuator Layer: Develop the PhaseEnableRobot and AngularServo classes in C++ to match the gpiozero behavior.
-   3. Vision Layer: Implement image capture, cropping (to 224x224), and TFLM inference.
+1. **Convert Model:**
+   ```bash
+   python convert_model.py
+   ```
+   This converts the `model_int8.tflite` into a C++ header file.
 
-  Phase 3: Validation
-   1. Motor Test: Run the test-full movements to ensure GPIO and PWM timings are correct.
-   2. Inference Test: Compare the classification output of the ESP32 against the original RPi implementation using a set of reference images.
-   3. Field Test: Validate the sun-tracking orientation loop, which is the most timing-sensitive part of the project.
+2. **Build and Flash:**
+   Open the `esp32_firmware` folder in VS Code with PlatformIO and click **Upload**.
 
-  Key Advantages of ESP32 Transition
-   * Instant-On: ESP32 boots in milliseconds compared to the RPi's minute-long Linux boot.
-   * Power Efficiency: Significantly lower power consumption, extending solar battery life.
-   * Reliability: No SD card corruption issues common with RPi power cycles.
+---
+
+### 2. Raspberry Pi Implementation (Legacy)
+The original implementation uses a Raspberry Pi Zero 2 W running Python.
+
+#### Setup & Installation
+1. **Improve SSH Response:**
+   If SSH hangs, run the following and reboot:
+   ```bash
+   echo "IPQoS cs0 cs0" | sudo tee -a /etc/ssh/sshd_config
+   ```
+2. **Install Git:**
+   ```bash
+   sudo apt-get -y install git
+   ```
+3. **Clone Repository:**
+   ```bash
+   git clone https://github.com/NathanBuildsDIY/weeder
+   ```
+4. **Run Initial Setup:**
+   ```bash
+   nohup sh weeder/initial-setup.sh &
+   ```
+5. **Access Control Panel:**
+   Connect to the **weeder** Wi-Fi hotspot and visit `http://weeder.local/run`.
+
+---
+
+##  Hardware & Design
+* **Schematics:** See [Schematic_PartsList.pdf](./Schematic_PartsList.pdf) for full electronic details.
+* **3D Files:** STL files for the body, lens arms, and covers are in the [3dPrinterFiles/](./3dPrinterFiles/) directory.
+* **AI Model:** The robot uses a custom MobileNetV2-based model (`model_int8.tflite`) for real-time weed identification.
+
+##  License
+This project is licensed under the terms found in the [LICENSE](./LICENSE) file.
